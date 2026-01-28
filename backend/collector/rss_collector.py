@@ -2,6 +2,8 @@ import feedparser
 import requests
 import json
 import os
+import re
+import html
 import time
 import logging
 from datetime import datetime, timezone
@@ -9,6 +11,23 @@ from typing import List, Dict
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
+
+
+def _fix_escaped_cdata(raw_xml: bytes) -> bytes:
+    """이스케이프된 CDATA(&lt;![CDATA[...]]&gt;)를 정상 CDATA로 변환."""
+    text = raw_xml.decode('utf-8', errors='replace')
+    text = text.replace('&lt;![CDATA[', '<![CDATA[')
+    text = text.replace(']]&gt;', ']]>')
+    return text.encode('utf-8')
+
+
+def _clean_text(text: str) -> str:
+    """CDATA 래퍼 제거 및 HTML 엔티티 디코딩."""
+    if not text:
+        return text
+    text = re.sub(r'<!\[CDATA\[(.*?)]]>', r'\1', text, flags=re.DOTALL)
+    text = html.unescape(text)
+    return text.strip()
 
 
 def _parse_datetime_safe(parsed_tuple):
@@ -51,7 +70,7 @@ class RSSCollector:
         for url in self.sources:
             try:
                 response = _fetch_with_retry(url, headers)
-                feed = feedparser.parse(response.content)
+                feed = feedparser.parse(_fix_escaped_cdata(response.content))
 
                 if feed.bozo:
                     logger.warning(f"피드 파싱 오류 {url}: {feed.bozo_exception}")
@@ -63,9 +82,9 @@ class RSSCollector:
                         or getattr(entry, 'updated_parsed', None)
                     )
 
-                    title = getattr(entry, 'title', '')[:500]
+                    title = _clean_text(getattr(entry, 'title', ''))[:500]
                     link = getattr(entry, 'link', '')
-                    summary = getattr(entry, 'summary', '')[:10000]
+                    summary = _clean_text(getattr(entry, 'summary', ''))[:10000]
                     source = feed.feed.get('title', url)[:255]
 
                     if not link:

@@ -1,48 +1,70 @@
 {
     "rss_feeds": [
         {
-            "name": "MDedge Dermatology",
-            "url": "https://www.mdedge.com/dermatology/rss",
-            "category": "News"
-        },
-        {
             "name": "Dermatology Times",
             "url": "https://www.dermatologytimes.com/rss",
             "category": "News"
         },
         {
-            "name": "Dermatologic Surgery",
-            "url": "https://journals.lww.com/dermatologicsurgery/_layouts/15/OAKS.Journals/feed.aspx?FeedType=CurrentIssue",
+            "name": "Journal of Cosmetic Dermatology",
+            "url": "https://onlinelibrary.wiley.com/feed/14732165/most-recent",
             "category": "Journal"
         },
         {
-            "name": "Plastic and Reconstructive Surgery",
-            "url": "https://journals.lww.com/plasreconsurg/_layouts/15/OAKS.Journals/feed.aspx?FeedType=CurrentIssue",
+            "name": "JEADV",
+            "url": "https://onlinelibrary.wiley.com/feed/14683083/most-recent",
             "category": "Journal"
+        },
+        {
+            "name": "Lasers in Surgery and Medicine",
+            "url": "https://onlinelibrary.wiley.com/feed/10969101/most-recent",
+            "category": "Journal"
+        },
+        {
+            "name": "JAAD",
+            "url": "https://www.jaad.org/current.rss",
+            "category": "Journal"
+        },
+        {
+            "name": "의학신문",
+            "url": "http://www.bosa.co.kr/rss/allArticle.xml",
+            "category": "News-KR"
+        },
+        {
+            "name": "청년의사",
+            "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml",
+            "category": "News-KR"
+        },
+        {
+            "name": "뷰티경제",
+            "url": "http://www.thebk.co.kr/rss/allArticle.xml",
+            "category": "News-KR"
         }
     ],
     "pubmed_queries": [
         "skin rejuvenation",
         "antiaging",
-        "aesthetic dermatology",
+        "aesthetic",
         "botulinum toxin",
         "skin booster",
         "filler",
         "exosome",
         "HIFU",
         "microneedling",
-        "RF"
+        "RF",
+        "dermatology"
     ],
     "google_scholar_keywords": [
         "skin rejuvenation",
         "antiaging",
-        "aesthetic dermatology",
+        "aesthetic",
         "botulinum toxin",
         "skin booster",
         "filler",
         "exosome",
         "HIFU",
         "microneedling",
-        "RF"
+        "RF",
+        "dermatology"
     ]
 }

@@ -2,11 +2,36 @@ import json
 import os
 import time
 import logging
+import threading
 from typing import List, Dict
 from datetime import datetime
 from scholarly import scholarly
 
 logger = logging.getLogger(__name__)
+
+KEYWORD_TIMEOUT = 15  # seconds per keyword search
+
+
+def _run_with_timeout(func, args=(), timeout=KEYWORD_TIMEOUT):
+    """Run *func* in a daemon thread; return (result, None) or (None, TimeoutError)."""
+    result = [None]
+    error = [None]
+
+    def target():
+        try:
+            result[0] = func(*args)
+        except Exception as e:
+            error[0] = e
+
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+
+    if t.is_alive():
+        return None, TimeoutError(f"{func.__name__} timed out after {timeout}s")
+    if error[0] is not None:
+        return None, error[0]
+    return result[0], None
 
 
 class GoogleScholarCollector:
@@ -25,53 +50,72 @@ class GoogleScholarCollector:
         except Exception as e:
             logger.error(f"소스 파일 로드 실패 ({filename}): {e}")
 
+    def _search_keyword(self, keyword: str, max_results: int) -> List[Dict]:
+        """Search a single keyword and return article dicts."""
+        results = []
+        search_query = scholarly.search_pubs(keyword)
+        for _ in range(max_results):
+            try:
+                pub = next(search_query)
+            except StopIteration:
+                break
+
+            bib = pub.get('bib', {})
+            title = bib.get('title', '')
+            abstract = bib.get('abstract', '')
+            pub_year = bib.get('pub_year', '')
+
+            # Parse publication date (scholarly only provides year)
+            if pub_year:
+                try:
+                    published = datetime(int(pub_year), 1, 1)
+                except (ValueError, TypeError):
+                    published = datetime.now()
+            else:
+                published = datetime.now()
+
+            # Determine URL: prefer pub_url, fall back to eprint (PDF link)
+            link = (pub.get('pub_url')
+                    or pub.get('eprint_url')
+                    or bib.get('url', ''))
+
+            if not link:
+                continue
+
+            results.append({
+                "title": title,
+                "link": link,
+                "summary": abstract,
+                "published": published,
+                "source": "Google Scholar",
+                "source_type": "Scholar",
+                "keywords": keyword,
+            })
+
+        return results
+
     def search_articles(self, max_results: int = 3) -> List[Dict]:
         all_results = []
         for keyword in self.keywords:
-            try:
-                search_query = scholarly.search_pubs(keyword)
-                for _ in range(max_results):
-                    try:
-                        pub = next(search_query)
-                    except StopIteration:
-                        break
+            result, err = _run_with_timeout(
+                self._search_keyword, args=(keyword, max_results), timeout=KEYWORD_TIMEOUT
+            )
 
-                    bib = pub.get('bib', {})
-                    title = bib.get('title', '')
-                    abstract = bib.get('abstract', '')
-                    pub_year = bib.get('pub_year', '')
+            if isinstance(err, TimeoutError):
+                logger.warning(
+                    f"Google Scholar 키워드 '{keyword}' 타임아웃 ({KEYWORD_TIMEOUT}초) — "
+                    f"CAPTCHA 가능성. 나머지 키워드 건너뜀."
+                )
+                break
+            elif err is not None:
+                logger.error(f"Google Scholar 검색 실패 (키워드: '{keyword}'): {err}")
+                continue
 
-                    # Parse publication date (scholarly only provides year)
-                    if pub_year:
-                        try:
-                            published = datetime(int(pub_year), 1, 1)
-                        except (ValueError, TypeError):
-                            published = datetime.now()
-                    else:
-                        published = datetime.now()
+            if result:
+                all_results.extend(result)
 
-                    # Determine URL: prefer pub_url, fall back to eprint (PDF link)
-                    link = (pub.get('pub_url')
-                            or pub.get('eprint_url')
-                            or bib.get('url', ''))
-
-                    if not link:
-                        continue
-
-                    all_results.append({
-                        "title": title,
-                        "link": link,
-                        "summary": abstract,
-                        "published": published,
-                        "source": "Google Scholar",
-                        "source_type": "Scholar",
-                        "keywords": keyword,
-                    })
-
-                # Delay between keyword searches to avoid being blocked
-                time.sleep(2)
-            except Exception as e:
-                logger.error(f"Google Scholar 검색 실패 (키워드: '{keyword}'): {e}")
+            # Delay between keyword searches to avoid being blocked
+            time.sleep(2)
 
         return all_results
 

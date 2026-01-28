@@ -3,6 +3,7 @@ __pycache__/
 *$py.class
 venv/
 .env
+mdinfo.db
 .DS_Store
 *.log
 frontend/node_modules/

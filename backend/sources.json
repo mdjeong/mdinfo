@@ -1,0 +1,48 @@
+{
+    "rss_feeds": [
+        {
+            "name": "MDedge Dermatology",
+            "url": "https://www.mdedge.com/dermatology/rss",
+            "category": "News"
+        },
+        {
+            "name": "Dermatology Times",
+            "url": "https://www.dermatologytimes.com/rss",
+            "category": "News"
+        },
+        {
+            "name": "Dermatologic Surgery",
+            "url": "https://journals.lww.com/dermatologicsurgery/_layouts/15/OAKS.Journals/feed.aspx?FeedType=CurrentIssue",
+            "category": "Journal"
+        },
+        {
+            "name": "Plastic and Reconstructive Surgery",
+            "url": "https://journals.lww.com/plasreconsurg/_layouts/15/OAKS.Journals/feed.aspx?FeedType=CurrentIssue",
+            "category": "Journal"
+        }
+    ],
+    "pubmed_queries": [
+        "skin rejuvenation",
+        "antiaging",
+        "aesthetic dermatology",
+        "botulinum toxin",
+        "skin booster",
+        "filler",
+        "exosome",
+        "HIFU",
+        "microneedling",
+        "RF"
+    ],
+    "google_scholar_keywords": [
+        "skin rejuvenation",
+        "antiaging",
+        "aesthetic dermatology",
+        "botulinum toxin",
+        "skin booster",
+        "filler",
+        "exosome",
+        "HIFU",
+        "microneedling",
+        "RF"
+    ]
+}

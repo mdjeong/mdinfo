@@ -1,0 +1,68 @@
+[project]
+name = "mdinfo-backend"
+version = "1.0.0"
+description = "MDinfo 백엔드 - 피부과/미용 분야 연구 논문 및 뉴스 수집/요약 서비스"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".git",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "W",      # pycodestyle warnings
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "N802",   # function name should be lowercase
+    "N803",   # argument name should be lowercase
+    "N806",   # variable in function should be lowercase
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["collector", "processor", "utils"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "venv",
+    ".venv",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "feedparser.*",
+    "pymed.*",
+    "scholarly.*",
+    "tenacity.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --tb=short"

@@ -2,8 +2,9 @@ import sys
 import os
 import logging
 import time
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,18 +14,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from backend.config import settings
 from backend.database import SessionLocal, engine, Base
 from backend.collector.rss_collector import RSSCollector
 from backend.collector.pubmed_collector import PubMedCollector
 from backend.collector.scholar_collector import GoogleScholarCollector
 from backend.processor.summarizer import Summarizer
+from backend.article_types import PipelineReport, StageStats
 from backend import crud, models
 
 # Creates tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-MAX_SUMMARY_WORKERS = 5
-SCHOLAR_COLLECTION_TIMEOUT = 60  # seconds — safety net for Scholar collection
+MAX_SUMMARY_WORKERS = settings.MAX_SUMMARY_WORKERS
+SCHOLAR_COLLECTION_TIMEOUT = settings.SCHOLAR_TIMEOUT
+COLLECTION_TIMEOUT = 120  # RSS/PubMed 수집 타임아웃
+
+
+def _collect_rss():
+    """RSS 피드 수집"""
+    logger.info("RSS 수집 시작...")
+    collector = RSSCollector()
+    results = collector.fetch_feeds()
+    logger.info(f"RSS 수집 완료: {len(results)}건")
+    return results
+
+
+def _collect_pubmed(max_results=3):
+    """PubMed 수집"""
+    logger.info("PubMed 수집 시작...")
+    collector = PubMedCollector()
+    results = collector.search_articles(max_results=max_results)
+    # PubMed 결과에 original_abstract 설정
+    for item in results:
+        item['original_abstract'] = item.get('summary', '')
+    logger.info(f"PubMed 수집 완료: {len(results)}건")
+    return results
+
+
+def _collect_scholar(max_results=3):
+    """Google Scholar 수집"""
+    logger.info("Google Scholar 수집 시작...")
+    collector = GoogleScholarCollector()
+    results = collector.search_articles(max_results=max_results)
+    # Scholar 결과에 original_abstract 설정
+    for item in results:
+        item['original_abstract'] = item.get('summary', '')
+    logger.info(f"Google Scholar 수집 완료: {len(results)}건")
+    return results
 
 
 def _summarize_item(summarizer, item):
@@ -48,62 +85,99 @@ def _summarize_item(summarizer, item):
     return item
 
 
-def run_collection():
+def _filter_new_items(db, items, source_name):
+    """중복 제거 후 새 아이템만 반환 (배치 조회 최적화)"""
+    if not items:
+        return []
+
+    # 한 번의 쿼리로 기존 URL 조회
+    urls = [item['link'] for item in items]
+    existing_urls = crud.get_existing_urls(db, urls)
+
+    # 수집된 아이템 내 중복도 제거
+    seen = set()
+    new_items = []
+
+    for item in items:
+        url = item['link']
+        if url in existing_urls:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        logger.info(f"새 {source_name} 아티클: {item['title'][:50]}")
+        new_items.append(item)
+
+    return new_items
+
+
+def run_collection() -> PipelineReport:
+    """데이터 수집 파이프라인 실행
+
+    Returns:
+        PipelineReport: 실행 결과 리포트
+    """
+    # 필수 환경 변수 검증
+    settings.validate_for_collection()
+
+    report = PipelineReport()
     db = SessionLocal()
     summarizer = Summarizer()
 
     try:
-        # ── 1단계: 수집 + 중복 필터 ──────────────────────────
+        # ── 1단계: 병렬 수집 ──────────────────────────────────
+        logger.info("=== 병렬 수집 시작 ===")
+        t0 = time.time()
+
+        all_results = {'rss': [], 'pubmed': [], 'scholar': []}
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(_collect_rss): 'rss',
+                executor.submit(_collect_pubmed, 3): 'pubmed',
+                executor.submit(_collect_scholar, 3): 'scholar',
+            }
+
+            for future in as_completed(futures):
+                source = futures[future]
+                timeout = SCHOLAR_COLLECTION_TIMEOUT if source == 'scholar' else COLLECTION_TIMEOUT
+                stats = StageStats(name=source)
+
+                try:
+                    results = future.result(timeout=timeout)
+                    all_results[source] = results
+                    stats.total = len(results)
+                    stats.success = len(results)
+                except TimeoutError:
+                    logger.warning(f"{source} 수집 타임아웃 ({timeout}초)")
+                    stats.failed = 1
+                    stats.errors.append({"type": "TimeoutError", "message": f"{timeout}초 타임아웃"})
+                except Exception as e:
+                    logger.error(f"{source} 수집 실패: {type(e).__name__}")
+                    stats.failed = 1
+                    stats.errors.append({"type": type(e).__name__, "message": str(e)})
+
+                report.collection[source] = stats
+
+        elapsed = time.time() - t0
+        for stats in report.collection.values():
+            stats.duration_seconds = elapsed / 3  # 대략적인 분배
+        logger.info(f"병렬 수집 완료: {elapsed:.1f}초 소요")
+
+        # ── 2단계: 중복 필터링 ────────────────────────────────
         new_items = []
-
-        # 1-a. RSS Collection
-        logger.info("RSS 수집 시작...")
-        rss_collector = RSSCollector()
-        rss_results = rss_collector.fetch_feeds()
-        for item in rss_results:
-            if not crud.get_article_by_url(db, item['link']):
-                logger.info(f"새 RSS 아티클: {item['title']}")
-                # RSS는 summary를 요약 대상으로 사용 (original_abstract 없음)
-                new_items.append(item)
-
-        # 1-b. PubMed Collection
-        logger.info("PubMed 수집 시작...")
-        pubmed_collector = PubMedCollector()
-        pubmed_results = pubmed_collector.search_articles(max_results=3)
-        for item in pubmed_results:
-            if not crud.get_article_by_url(db, item['link']):
-                logger.info(f"새 PubMed 아티클: {item['title']}")
-                item['original_abstract'] = item['summary']
-                new_items.append(item)
-
-        # 1-c. Google Scholar Collection (daemon thread + safety timeout)
-        logger.info("Google Scholar 수집 시작...")
-        scholar_results_box = []  # mutable container for thread result
-
-        def _collect_scholar():
-            collector = GoogleScholarCollector()
-            scholar_results_box.extend(collector.search_articles(max_results=3))
-
-        scholar_thread = threading.Thread(target=_collect_scholar, daemon=True)
-        scholar_thread.start()
-        scholar_thread.join(timeout=SCHOLAR_COLLECTION_TIMEOUT)
-
-        if scholar_thread.is_alive():
-            logger.warning(
-                f"Google Scholar 수집이 {SCHOLAR_COLLECTION_TIMEOUT}초 내에 완료되지 않아 건너뜁니다. "
-                f"CAPTCHA 차단 가능성이 있습니다."
-            )
-        else:
-            for item in scholar_results_box:
-                if not crud.get_article_by_url(db, item['link']):
-                    logger.info(f"새 Scholar 아티클: {item['title']}")
-                    item['original_abstract'] = item['summary']
-                    new_items.append(item)
+        for source, source_name in [('rss', 'RSS'), ('pubmed', 'PubMed'), ('scholar', 'Scholar')]:
+            filtered = _filter_new_items(db, all_results[source], source_name)
+            skipped = len(all_results[source]) - len(filtered)
+            report.collection[source].skipped = skipped
+            new_items.extend(filtered)
 
         logger.info(f"수집 완료. 신규 아티클 {len(new_items)}건 요약 시작...")
 
-        # ── 2단계: 병렬 요약 ─────────────────────────────────
+        # ── 3단계: 병렬 요약 ─────────────────────────────────
         t0 = time.time()
+        summarize_stats = StageStats(name="summarize", total=len(new_items))
+
         with ThreadPoolExecutor(max_workers=MAX_SUMMARY_WORKERS) as executor:
             futures = {
                 executor.submit(_summarize_item, summarizer, item): item
@@ -113,29 +187,52 @@ def run_collection():
             for future in as_completed(futures):
                 try:
                     summarized_items.append(future.result())
+                    summarize_stats.success += 1
                 except Exception as e:
                     failed_item = futures[future]
                     logger.error(f"요약 작업 예외 ({failed_item['title'][:30]}): {e}")
                     summarized_items.append(failed_item)
+                    summarize_stats.failed += 1
+                    summarize_stats.errors.append({
+                        "title": failed_item['title'][:50],
+                        "error": type(e).__name__,
+                    })
 
-        elapsed = time.time() - t0
-        logger.info(f"요약 완료: {len(summarized_items)}건, {elapsed:.1f}초 소요")
+        summarize_stats.duration_seconds = time.time() - t0
+        report.summarization = summarize_stats
+        logger.info(f"요약 완료: {len(summarized_items)}건, {summarize_stats.duration_seconds:.1f}초 소요")
 
-        # ── 3단계: 순차 DB 저장 ──────────────────────────────
-        saved = 0
+        # ── 4단계: 순차 DB 저장 ──────────────────────────────
+        t0 = time.time()
+        save_stats = StageStats(name="save", total=len(summarized_items))
+
         for item in summarized_items:
             try:
                 crud.create_article(db, item)
-                saved += 1
+                save_stats.success += 1
             except Exception as e:
                 logger.error(f"DB 저장 실패 ({item['title'][:30]}): {e}")
+                save_stats.failed += 1
+                save_stats.errors.append({
+                    "title": item['title'][:50],
+                    "error": type(e).__name__,
+                })
 
-        logger.info(f"저장 완료: {saved}/{len(summarized_items)}건")
+        save_stats.duration_seconds = time.time() - t0
+        report.saving = save_stats
+        logger.info(f"저장 완료: {save_stats.success}/{save_stats.total}건")
 
     except Exception as e:
         logger.error(f"수집 중 오류 발생: {e}", exc_info=True)
     finally:
         db.close()
+        report.ended_at = datetime.now()
+
+    # 리포트 출력
+    logger.info(f"=== 파이프라인 리포트 ===")
+    logger.info(json.dumps(report.to_dict(), indent=2, ensure_ascii=False, default=str))
+
+    return report
 
 
 if __name__ == "__main__":

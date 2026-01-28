@@ -1,6 +1,27 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Generic, TypeVar, List
 from datetime import datetime
+
+T = TypeVar("T")
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    """표준 API 응답 형식"""
+
+    success: bool
+    data: Optional[T] = None
+    error: Optional[str] = None
+    message: Optional[str] = None
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """페이지네이션 응답 형식"""
+
+    items: List[T]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
 
 
 class ArticleResponse(BaseModel):

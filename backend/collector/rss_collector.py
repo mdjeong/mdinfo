@@ -6,9 +6,15 @@ import re
 import html
 import time
 import logging
+import sys
 from datetime import datetime, timezone
 from typing import List, Dict
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import settings
+from article_types import ArticleDict
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +68,7 @@ class RSSCollector:
         except Exception as e:
             logger.error(f"소스 파일 로드 실패 ({filename}): {e}")
 
-    def fetch_feeds(self) -> List[Dict]:
+    def fetch_feeds(self) -> List[ArticleDict]:
         results = []
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -82,10 +88,10 @@ class RSSCollector:
                         or getattr(entry, 'updated_parsed', None)
                     )
 
-                    title = _clean_text(getattr(entry, 'title', ''))[:500]
+                    title = _clean_text(getattr(entry, 'title', ''))[:settings.TITLE_MAX_LENGTH]
                     link = getattr(entry, 'link', '')
-                    summary = _clean_text(getattr(entry, 'summary', ''))[:10000]
-                    source = feed.feed.get('title', url)[:255]
+                    summary = _clean_text(getattr(entry, 'summary', ''))[:settings.SUMMARY_MAX_LENGTH]
+                    source = feed.feed.get('title', url)[:settings.SOURCE_MAX_LENGTH]
 
                     if not link:
                         continue

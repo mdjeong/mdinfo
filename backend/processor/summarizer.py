@@ -1,28 +1,59 @@
 import openai
-import os
+from openai import RateLimitError, APIError, APIConnectionError
 import json
 import logging
-from dotenv import load_dotenv
+import sys
+import os
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 
-load_dotenv()
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import settings
+from article_types import SummaryResult
 
 logger = logging.getLogger(__name__)
 
 
 class Summarizer:
     def __init__(self, api_key: str = None):
-        api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4o")
+        api_key = api_key or settings.OPENAI_API_KEY
+        self.model = settings.OPENAI_MODEL
+        self.max_tokens = settings.OPENAI_MAX_TOKENS
+        self.text_limit = settings.OPENAI_TEXT_LIMIT
+
         if not api_key:
-            logger.warning("OPENAI_API_KEY 미설정. 요약 기능 비활성화.")
-            self.client = None
-        else:
-            self.client = openai.OpenAI(api_key=api_key)
+            raise EnvironmentError(
+                "OPENAI_API_KEY가 설정되지 않았습니다. "
+                ".env 파일을 확인하거나 환경 변수를 설정해주세요."
+            )
+        self.client = openai.OpenAI(api_key=api_key)
 
-    def summarize(self, title: str, text: str, context: str = "dermatology research") -> dict:
-        if not self.client:
-            return {"title_ko": None, "summary": "Summarization unavailable: API key missing."}
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=4, max=30),
+        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )
+    def _call_api(self, prompt: str) -> SummaryResult:
+        """OpenAI API 호출 (재시도 포함)"""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Respond strictly in JSON format."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=self.max_tokens,
+            response_format={"type": "json_object"}
+        )
+        return json.loads(response.choices[0].message.content.strip())
 
+    def summarize(self, title: str, text: str, context: str = "dermatology research") -> SummaryResult:
         prompt = f"""
         당신은 피부과 전문의 및 연구원을 위한 전문 요약 조수입니다.
         다음 논문/기사의 제목과 본문을 읽고 한국어로 번역 및 요약해주세요.
@@ -30,7 +61,7 @@ class Summarizer:
         [Context]: {context}
         [Title]: {title}
         [Text]:
-        {text[:4000]}
+        {text[:self.text_limit]}
 
         [요청사항]:
         1. "title_ko": 제목을 학술적인 한국어로 자연스럽게 번역할 것.
@@ -39,18 +70,9 @@ class Summarizer:
         """
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant. Respond strictly in JSON format."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1000,
-                response_format={"type": "json_object"}
-            )
-            return json.loads(response.choices[0].message.content.strip())
+            return self._call_api(prompt)
         except Exception as e:
-            logger.error(f"요약 실패: {e}", exc_info=True)
+            logger.error(f"요약 실패: {type(e).__name__}")
             return {"title_ko": None, "summary": "Summarization failed due to an error."}
 
 

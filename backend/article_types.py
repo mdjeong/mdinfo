@@ -18,6 +18,7 @@ class ArticleDict(TypedDict, total=False):
     title_ko: Optional[str]
     keywords: Optional[str]
     doi: Optional[str]
+    category: Optional[str]  # 'News', 'News-KR', 'Journal', 'Academic'
 
 
 class SummaryResult(TypedDict):

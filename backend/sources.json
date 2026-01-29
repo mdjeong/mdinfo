@@ -3,42 +3,66 @@
         {
             "name": "Dermatology Times",
             "url": "https://www.dermatologytimes.com/rss",
-            "category": "News"
+            "category": "News",
+            "max_items": 10,
+            "filter_relevance": true,
+            "language": "en"
         },
         {
             "name": "Journal of Cosmetic Dermatology",
             "url": "https://onlinelibrary.wiley.com/feed/14732165/most-recent",
-            "category": "Journal"
+            "category": "Journal",
+            "max_items": 5,
+            "filter_relevance": false,
+            "language": "en"
         },
         {
             "name": "JEADV",
             "url": "https://onlinelibrary.wiley.com/feed/14683083/most-recent",
-            "category": "Journal"
+            "category": "Journal",
+            "max_items": 5,
+            "filter_relevance": false,
+            "language": "en"
         },
         {
             "name": "Lasers in Surgery and Medicine",
             "url": "https://onlinelibrary.wiley.com/feed/10969101/most-recent",
-            "category": "Journal"
+            "category": "Journal",
+            "max_items": 5,
+            "filter_relevance": false,
+            "language": "en"
         },
         {
             "name": "JAAD",
             "url": "https://www.jaad.org/current.rss",
-            "category": "Journal"
+            "category": "Journal",
+            "max_items": 5,
+            "filter_relevance": false,
+            "language": "en"
         },
         {
             "name": "의학신문",
             "url": "http://www.bosa.co.kr/rss/allArticle.xml",
-            "category": "News-KR"
+            "category": "News-KR",
+            "max_items": 10,
+            "filter_relevance": true,
+            "language": "ko"
         },
         {
             "name": "청년의사",
             "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml",
-            "category": "News-KR"
+            "category": "News-KR",
+            "max_items": 10,
+            "filter_relevance": true,
+            "language": "ko"
         },
         {
             "name": "뷰티경제",
             "url": "http://www.thebk.co.kr/rss/allArticle.xml",
-            "category": "News-KR"
+            "category": "News-KR",
+            "max_items": 10,
+            "filter_relevance": true,
+            "language": "ko"
         }
     ],
     "pubmed_queries": [
@@ -66,5 +90,13 @@
         "microneedling",
         "RF",
         "dermatology"
-    ]
+    ],
+    "collection_config": {
+        "pubmed_per_query": 5,
+        "scholar_per_query": 4,
+        "target_news_ratio": 0.60,
+        "target_academic_ratio": 0.40,
+        "enable_relevance_filter": true,
+        "relevance_filter_model": "gpt-4o-mini"
+    }
 }

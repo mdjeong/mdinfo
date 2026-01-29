@@ -52,13 +52,14 @@ def read_root():
 def read_articles(
     skip: int = Query(default=0, ge=0, description="건너뛸 항목 수"),
     limit: int = Query(default=20, ge=1, le=100, description="반환할 최대 항목 수"),
+    category: Optional[str] = Query(default=None, description="카테고리 필터링 ('news', 'paper', 'all')"),
     source: Optional[str] = Query(default=None, description="소스별 필터링"),
     search: Optional[str] = Query(default=None, description="제목/요약 검색"),
     db: Session = Depends(get_db),
 ):
-    """아티클 목록 조회 (페이지네이션, 필터링, 검색 지원)"""
+    """아티클 목록 조회 (페이지네이션, 카테고리, 필터링, 검색 지원)"""
     cache = get_cache()
-    cache_key = f"articles:{skip}:{limit}:{source}:{search}"
+    cache_key = f"articles:{skip}:{limit}:{category}:{source}:{search}"
 
     # 캐시 조회
     cached_result = cache.get(cache_key)
@@ -67,7 +68,7 @@ def read_articles(
 
     # DB 조회
     total, articles = crud.get_articles_filtered(
-        db, skip=skip, limit=limit, source=source, search=search
+        db, skip=skip, limit=limit, category=category, source=source, search=search
     )
 
     result = PaginatedResponse(

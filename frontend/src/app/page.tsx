@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Article, isArticleArray } from '../types';
+import { Article, PaginatedResponse, isPaginatedResponse } from '../types';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import Navigation from '@/components/Navigation';
+import ArticleCard from '@/components/ArticleCard';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const ITEMS_PER_PAGE = 12;
@@ -108,12 +110,12 @@ export default function Home() {
       }
 
       const data: unknown = await res.json();
-      if (!isArticleArray(data)) {
+      if (!isPaginatedResponse(data)) {
         throw new Error('잘못된 응답 형식입니다.');
       }
 
       // 필수 필드 검증 후 유효한 데이터만 사용
-      const validArticles = data.filter(isValidArticle);
+      const validArticles = data.items.filter(isValidArticle);
 
       if (append) {
         setArticles(prev => [...prev, ...validArticles]);
@@ -121,7 +123,7 @@ export default function Home() {
         setArticles(validArticles);
       }
 
-      setHasMore(data.length === ITEMS_PER_PAGE);
+      setHasMore(data.has_more);
       setTotalLoaded(prev => append ? prev + validArticles.length : validArticles.length);
     } catch (err) {
       clearTimeout(timeoutId);
@@ -153,6 +155,7 @@ export default function Home() {
           </div>
           <ThemeToggle />
         </header>
+        <Navigation />
         <div className="skeleton-grid" aria-label="로딩 중" role="status">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="skeleton-card">
@@ -175,6 +178,14 @@ export default function Home() {
   if (error && articles.length === 0) {
     return (
       <main id="main-content" className="error-state">
+        <header className="header-with-toggle">
+          <div>
+            <h1>Derma-Insight</h1>
+            <p>피부과/미용 연구 뉴스</p>
+          </div>
+          <ThemeToggle />
+        </header>
+        <Navigation />
         <div className="error-content" role="alert">
           <h2>오류가 발생했습니다</h2>
           <p>{error}</p>
@@ -188,10 +199,15 @@ export default function Home() {
 
   return (
     <main id="main-content">
-      <header>
-        <h1>Derma-Insight</h1>
-        <p>피부과/미용 연구 뉴스</p>
+      <header className="header-with-toggle">
+        <div>
+          <h1>Derma-Insight</h1>
+          <p>피부과/미용 연구 뉴스</p>
+        </div>
+        <ThemeToggle />
       </header>
+
+      <Navigation />
 
       {/* 검색 및 필터 UI */}
       {articles.length > 0 && (
@@ -247,56 +263,7 @@ export default function Home() {
           <p className="results-info">{filteredArticles.length}개 기사</p>
           <div className="card-grid">
             {filteredArticles.map((article) => (
-              <article key={article.id} className="card">
-                <div className="card-header">
-                  <div>
-                    <span className="source-tag">{article.source}</span>
-                    <span className="date">
-                      <time dateTime={article.published_date}>
-                        {new Date(article.published_date).toLocaleDateString('ko-KR')}
-                      </time>
-                    </span>
-                  </div>
-                  <button
-                    className="share-button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(article.url);
-                      alert('링크가 복사되었습니다!');
-                    }}
-                    aria-label="링크 복사"
-                    title="링크 복사"
-                  >
-                    🔗
-                  </button>
-                </div>
-                <h2>
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="external-link"
-                  >
-                    {article.title_ko || article.title}
-                    <span className="sr-only"> (새 탭에서 열림)</span>
-                  </a>
-                </h2>
-                {article.title_ko && article.title !== article.title_ko && (
-                  <div className="original-title">{article.title}</div>
-                )}
-                {article.summary && (
-                  <div className="summary-box">
-                    <strong className="summary-label">
-                      <span role="img" aria-label="전구 아이콘">💡</span> AI 요약
-                    </strong>
-                    {article.summary}
-                  </div>
-                )}
-                <div className="keywords-container">
-                  {article.keywords?.split(',').filter(Boolean).map((k, i) => (
-                    <span key={i} className="keyword-tag">#{k.trim()}</span>
-                  ))}
-                </div>
-              </article>
+              <ArticleCard key={article.id} article={article} />
             ))}
           </div>
 

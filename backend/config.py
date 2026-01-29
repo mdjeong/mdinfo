@@ -23,7 +23,7 @@ class Settings:
     # Database
     # SQLite: sqlite:///./mdinfo.db
     # PostgreSQL: postgresql://user:password@localhost:5432/mdinfo
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./mdinfo.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BACKEND_DIR}/mdinfo.db")
 
     # PostgreSQL 개별 설정 (DATABASE_URL이 없을 때 사용)
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
@@ -46,8 +46,8 @@ class Settings:
                 f"@{cls.POSTGRES_HOST}:{cls.POSTGRES_PORT}/{cls.POSTGRES_DB}"
             )
 
-        # 기본값: SQLite
-        return "sqlite:///./mdinfo.db"
+        # 기본값: SQLite (backend 디렉토리의 mdinfo.db)
+        return f"sqlite:///{BACKEND_DIR}/mdinfo.db"
 
     # API Server
     ALLOWED_ORIGINS: List[str] = os.getenv(
@@ -87,6 +87,14 @@ class Settings:
     SCHEDULER_ENABLED: bool = os.getenv("SCHEDULER_ENABLED", "false").lower() == "true"
     SCHEDULER_COLLECTION_HOURS: str = os.getenv("SCHEDULER_COLLECTION_HOURS", "6,18")
     SCHEDULER_INTERVAL_HOURS: int = int(os.getenv("SCHEDULER_INTERVAL_HOURS", "0"))
+
+    # Relevance Filter
+    RELEVANCE_FILTER_ENABLED: bool = os.getenv("RELEVANCE_FILTER_ENABLED", "true").lower() == "true"
+    RELEVANCE_FILTER_MODEL: str = os.getenv("RELEVANCE_FILTER_MODEL", "gpt-4o-mini")
+
+    # Collection Ratio
+    TARGET_NEWS_RATIO: float = float(os.getenv("TARGET_NEWS_RATIO", "0.60"))
+    TARGET_ACADEMIC_RATIO: float = float(os.getenv("TARGET_ACADEMIC_RATIO", "0.40"))
 
     @classmethod
     def validate_required(cls, *keys: str) -> None:

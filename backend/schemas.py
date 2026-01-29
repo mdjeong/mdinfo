@@ -30,6 +30,8 @@ class ArticleResponse(BaseModel):
     title_ko: Optional[str] = None
     url: Optional[str] = None
     source: Optional[str] = None
+    category: Optional[str] = None  # 'news' or 'paper'
+    source_type: Optional[str] = None  # 'RSS', 'PubMed', 'Scholar'
     published_date: Optional[datetime] = None
     summary: Optional[str] = None
     original_abstract: Optional[str] = None

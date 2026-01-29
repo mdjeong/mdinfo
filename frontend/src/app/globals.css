@@ -548,3 +548,91 @@ header {
     background: var(--background);
   }
 }
+
+/* Category Navigation Tabs */
+.category-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--accent);
+}
+
+.category-tabs a {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--secondary);
+}
+
+.category-tabs a:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.category-tabs a.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+/* Category Badge */
+.category-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  text-transform: uppercase;
+}
+
+.category-badge.news {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.category-badge.paper {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+/* Dark mode for badges */
+[data-theme="dark"] .category-badge.news,
+:root:not([data-theme="light"]) .category-badge.news {
+  background-color: #1565c0;
+  color: #bbdefb;
+}
+
+[data-theme="dark"] .category-badge.paper,
+:root:not([data-theme="light"]) .category-badge.paper {
+  background-color: #6a1b9a;
+  color: #e1bee7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .category-badge.news {
+    background-color: #1565c0;
+    color: #bbdefb;
+  }
+
+  :root:not([data-theme="light"]) .category-badge.paper {
+    background-color: #6a1b9a;
+    color: #e1bee7;
+  }
+}
+
+/* Responsive tabs */
+@media (max-width: 600px) {
+  .category-tabs {
+    gap: 0;
+  }
+
+  .category-tabs a {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}

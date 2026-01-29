@@ -19,6 +19,8 @@ def create_article(db: Session, article_data: dict) -> Optional[models.Article]:
             title_ko=article_data.get("title_ko"),
             url=article_data.get("link"),
             source=article_data.get("source"),
+            category=article_data.get("category", "paper"),
+            source_type=article_data.get("source_type", "RSS"),
             published_date=article_data.get("published"),
             summary=article_data.get("summary"),
             original_abstract=article_data.get("original_abstract", ""),
@@ -71,6 +73,7 @@ def get_articles_filtered(
     db: Session,
     skip: int = 0,
     limit: int = 100,
+    category: Optional[str] = None,
     source: Optional[str] = None,
     search: Optional[str] = None,
 ) -> tuple[int, List[models.Article]]:
@@ -80,6 +83,7 @@ def get_articles_filtered(
         db: DB 세션
         skip: 건너뛸 항목 수
         limit: 반환할 최대 항목 수
+        category: 카테고리 필터링 ('news', 'paper', 'all' 또는 None)
         source: 소스별 필터링 (부분 일치)
         search: 제목/요약 검색어
 
@@ -87,6 +91,10 @@ def get_articles_filtered(
         (전체 개수, 아티클 목록) 튜플
     """
     query = db.query(models.Article)
+
+    # 카테고리 필터링
+    if category and category in ('news', 'paper'):
+        query = query.filter(models.Article.category == category)
 
     # 소스 필터링
     if source:

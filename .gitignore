@@ -6,6 +6,7 @@ venv/
 mdinfo.db
 .DS_Store
 *.log
+backend/collection_log.txt
 frontend/node_modules/
 frontend/.next/
 frontend/out/

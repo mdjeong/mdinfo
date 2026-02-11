@@ -5,6 +5,7 @@ venv/
 .env
 mdinfo.db
 .DS_Store
+.python-version
 *.log
 backend/collection_log.txt
 frontend/node_modules/
